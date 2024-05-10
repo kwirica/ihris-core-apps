@@ -648,37 +648,40 @@ export default {
     listViz() {
       this.loadingAvailableVizs = true;
       this.displayVizList = true;
+      this.availableViz = [];
       this.getViz().then(() => {
         this.loadingAvailableVizs = false;
       });
     },
     getViz(url) {
       return new Promise((resolve, reject) => {
-        this.availableViz = [];
         if (!url) {
           url =
-            "/fhir/Basic?_profile=http://ihris.org/fhir/StructureDefinition/ihris-data-visualization";
+            "/fhir/Basic?_count=200&_profile=http://ihris.org/fhir/StructureDefinition/ihris-data-visualization";
         }
         fetch(url).then((response) => {
           response.json().then((data) => {
-            for (const entry of data.entry) {
-              const name = entry.resource.extension.find((ext) => {
-                return (
-                  ext.url ===
-                  "http://ihris.org/fhir/StructureDefinition/ihris-basic-name"
-                );
-              });
-              if (name) {
-                this.availableViz.push({
-                  id: entry.resource.id,
-                  name: name.valueString,
+            if (data.entry && data.entry.length) {
+              for (const entry of data.entry) {
+                const name = entry.resource.extension.find((ext) => {
+                  return (
+                    ext.url ===
+                    "http://ihris.org/fhir/StructureDefinition/ihris-basic-name"
+                  );
                 });
+                if (name) {
+                  this.availableViz.push({
+                    id: entry.resource.id,
+                    name: name.valueString,
+                  });
+                }
               }
             }
             const next = data.link.find((link) => {
               return link.relation === "next";
             });
             if (next) {
+              next.url = next.url.substring(next.url.indexOf("/fhir/"));
               this.getViz(next.url)
                 .then(() => {
                   return resolve();

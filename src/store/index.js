@@ -5,8 +5,10 @@ const store = createStore({
     user: {
       loggedin: false,
       name: "",
+      obj: {},
     },
     idp: "ihris",
+    fhirFlattener: "fhir2es",
     security_off: false,
     message: {
       type: "info",
@@ -141,12 +143,9 @@ const store = createStore({
     login(state, user) {
       state.user.loggedin = true;
       state.user.name = user.name;
-      state.user.location = user.location;
       state.user.role = user.role;
       state.user.userId = user.userId;
-      state.user.reference = user.reference;
-      state.user.facilityId = user.facilityId;
-      state.user.physicalLocation = user.physicalLocation;
+      state.user.obj = user.obj;
     },
     logout(state) {
       state.user.loggedin = false;

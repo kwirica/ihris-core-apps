@@ -749,7 +749,7 @@
             cols="12"
             v-if="renderSettings && chart.renderComponent === 'IhrisAxisChart'"
           >
-            <center><h3>Basic Settings</h3></center>
+            <h3>Basic Settings</h3>
             <v-row>
               <v-col cols="6">
                 <v-switch
@@ -1013,7 +1013,8 @@ export default {
           option,
           chartOptions,
           dataset,
-          otherOptions
+          otherOptions,
+          store.state.fhirFlattener
         );
         addFilters.value = IhrisChart.addFilters;
         getChartData.value = IhrisChart.getChartData;
@@ -1024,7 +1025,8 @@ export default {
           chart,
           option,
           chartOptions,
-          dataset
+          dataset,
+          store.state.fhirFlattener
         );
         addFilters.value = IhrisChart.addFilters;
         getChartData.value = IhrisChart.getChartData;
@@ -1232,9 +1234,16 @@ export default {
         categories.value = [];
         series.value = [];
         filters.value = [];
-        fetch(
-          "/es/listFields/" + dataset.value.name + "?id=" + dataset.value.id
-        )
+        let url =
+          "/es/listFields/" + dataset.value.name + "?id=" + dataset.value.id;
+        if (store.state.fhirFlattener === "fhir2sql") {
+          url =
+            "/fhir2sql/listFields/" +
+            dataset.value.name +
+            "?id=" +
+            dataset.value.id;
+        }
+        fetch(url)
           .then((response) => {
             response.json().then((fields) => {
               dimensions.value = fields;
@@ -1738,7 +1747,7 @@ export default {
       return new Promise((resolve, reject) => {
         if (!url) {
           url =
-            "/fhir/Basic?_profile=http://ihris.org/fhir/StructureDefinition/ihris-data-visualization";
+            "/fhir/Basic?_count=200&_profile=http://ihris.org/fhir/StructureDefinition/ihris-data-visualization";
         }
         fetch(url).then((response) => {
           response.json().then((data) => {
@@ -1760,6 +1769,7 @@ export default {
               return link.relation === "next";
             });
             if (next) {
+              next.url = next.url.substring(next.url.indexOf("/fhir/"));
               getVizByUrl(next.url)
                 .then(() => {
                   return resolve();
@@ -1778,6 +1788,7 @@ export default {
     function listViz() {
       loadingData.value = true;
       displayVizList.value = true;
+      visualizations.value = [];
       getVizByUrl().then(() => {
         loadingData.value = false;
       });
@@ -1797,7 +1808,11 @@ export default {
         });
         reloadIhrisChart();
       }
-      fetch("/es/indices")
+      let url = "/es/indices";
+      if (store.state.fhirFlattener === "fhir2sql") {
+        url = "/fhir2sql/reports-list";
+      }
+      fetch(url)
         .then((response) => {
           response.json().then((indices) => {
             datasets.value = indices;
@@ -1867,7 +1882,10 @@ export default {
       this.activeDimension.name = this[type][indexInType].display;
       this.activeDimension.index = indexInType;
       const dimension = this[type][indexInType].name;
-      const url = `/es/populateFilter/${this.dataset.name}/${dimension}?dataType=${this[type][indexInType].type}`;
+      let url = `/es/populateFilter/${this.dataset.name}/${dimension}?dataType=${this[type][indexInType].type}`;
+      if (this.$store.state.fhirFlattener === "fhir2sql") {
+        url = `/fhir2sql/populateFilter/${this.dataset.name}/${dimension}?dataType=${this[type][indexInType].type}`;
+      }
       this[type][indexInType].allValues = [];
       if (!this[type][indexInType].selectedValues) {
         this[type][indexInType].selectedValues = [];
@@ -1881,12 +1899,15 @@ export default {
       }).then((response) => {
         response.json().then((data) => {
           for (const bucket of data) {
-            if (
-              this[type][indexInType].selectedValues.indexOf(
-                bucket.key.value
-              ) === -1
-            ) {
-              this[type][indexInType].allValues.push(bucket.key.value);
+            let value;
+            if (this.$store.state.fhirFlattener === "fhir2sql") {
+              let key = Object.keys(bucket)[0];
+              value = bucket[key];
+            } else {
+              value = bucket.key.value;
+            }
+            if (this[type][indexInType].selectedValues.indexOf(value) === -1) {
+              this[type][indexInType].allValues.push(value);
             }
           }
           this.activeDimension.loading = false;

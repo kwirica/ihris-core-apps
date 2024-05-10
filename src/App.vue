@@ -76,6 +76,7 @@ export default {
               response
                 .json()
                 .then((data) => {
+                  this.$store.state.fhirFlattener = data.fhirFlattener;
                   if (
                     Object.prototype.hasOwnProperty.call(data, "security") &&
                     Object.prototype.hasOwnProperty.call(
@@ -104,11 +105,8 @@ export default {
                     if (data.user.loggedin) {
                       const user = {
                         name: data.user.name,
-                        location: data.user.location,
                         role: data.user.role,
-                        reference: data.user.reference,
-                        facilityId: data.user.facilityId,
-                        physicalLocation: data.user.physicalLocation,
+                        obj: data.user.obj,
                       };
                       this.$store.commit("login", user);
                     } else {

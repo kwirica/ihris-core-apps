@@ -6,7 +6,8 @@ export default function IhrisAxisChart(
   option,
   chartOptions,
   dataset,
-  otherOptions
+  otherOptions,
+  fhirFlattener
 ) {
   let data = ref("");
   const query = ref({
@@ -49,20 +50,32 @@ export default function IhrisAxisChart(
           categories: {},
         };
         if (categories.value.length === 1) {
-          const category = categories.value[0];
-          let field = category.name;
-          if (category.type === "text") {
-            field += ".keyword";
+          if (fhirFlattener === "fhir2sql") {
+            let categoryName = categories.value[0].name;
+            let seriesName = series.value[0].name;
+            query.value = `select a.*,coalesce(count,0) as count
+            from 
+            ((select * from (select distinct ${categoryName} from ${dataset.value.name}) as foo,(select distinct ${seriesName} from ${dataset.value.name}) as baa)) a
+            left join
+            (select ${categoryName}, ${seriesName},count(*) as count from ${dataset.value.name} group by ${categoryName},${seriesName}) as  b
+            on a.${categoryName}=b.${categoryName} and a.${seriesName}=b.${seriesName}
+            order by a.${categoryName},b.${seriesName}`;
+          } else if (fhirFlattener === "fhir2es") {
+            const category = categories.value[0];
+            let field = category.name;
+            if (category.type === "text") {
+              field += ".keyword";
+            }
+            const term = {};
+            term[category.name] = {
+              terms: {
+                field,
+              },
+            };
+            query.value.aggs.categories.composite = {
+              sources: [term],
+            };
           }
-          const term = {};
-          term[category.name] = {
-            terms: {
-              field,
-            },
-          };
-          query.value.aggs.categories.composite = {
-            sources: [term],
-          };
         } else {
           const terms = [];
           for (const category of categories.value) {
@@ -84,24 +97,26 @@ export default function IhrisAxisChart(
             sources: terms,
           };
         }
-        query.value.aggs.categories.aggs = {
-          series: {},
-        };
-        if (
-          series.value[0].aggsBy.name === "value_count" &&
-          chart.value.type !== "pie"
-        ) {
-          query.value.aggs.categories.aggs.series.terms = {
-            field: seriesField,
-            order: { _key: "asc" },
-            min_doc_count: 0,
-            size: 2000000,
+        if (fhirFlattener === "fhir2es") {
+          query.value.aggs.categories.aggs = {
+            series: {},
           };
-        } else {
-          const aggBy = series.value[0].aggsBy.name;
-          query.value.aggs.categories.aggs.series[aggBy] = {
-            field: seriesField,
-          };
+          if (
+            series.value[0].aggsBy.name === "value_count" &&
+            chart.value.type !== "pie"
+          ) {
+            query.value.aggs.categories.aggs.series.terms = {
+              field: seriesField,
+              order: { _key: "asc" },
+              min_doc_count: 0,
+              size: 2000000,
+            };
+          } else {
+            const aggBy = series.value[0].aggsBy.name;
+            query.value.aggs.categories.aggs.series[aggBy] = {
+              field: seriesField,
+            };
+          }
         }
       } else {
         const terms = {};
@@ -124,7 +139,11 @@ export default function IhrisAxisChart(
           if (categories.value.length > 1) {
             parseMultiCategoryResults();
           } else {
-            parseResults();
+            if (fhirFlattener === "fhir2sql") {
+              parseSQLResults();
+            } else {
+              parseResults();
+            }
           }
           return resolve();
         })
@@ -136,54 +155,72 @@ export default function IhrisAxisChart(
 
   function getData() {
     return new Promise((resolve, reject) => {
-      let aggKey = "categories";
-      if (chart.value.maxCategories === 0 || categories.value.length === 0) {
-        aggKey = "series";
-      }
-      const url = `/es/${dataset.value.name}/_search?filter_path=aggregations`;
-      fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(query.value),
-      })
-        .then((response) => {
-          response
-            .json()
-            .then((results) => {
-              if (!data.value) {
-                data.value = results;
-              } else if (
-                results.aggregations[aggKey].buckets &&
-                results.aggregations[aggKey].buckets.length > 0
-              ) {
-                data.value.aggregations[aggKey].buckets =
-                  data.value.aggregations[aggKey].buckets.concat(
-                    results.aggregations[aggKey].buckets
-                  );
-              }
-              if (
-                results.aggregations &&
-                results.aggregations[aggKey].after_key
-              ) {
-                query.value.aggs[aggKey].composite.after =
-                  results.aggregations[aggKey].after_key;
-                getData().then(() => {
-                  return resolve();
-                });
-              } else {
-                return resolve();
-              }
-            })
-            .catch((err) => {
-              console.log(err);
-              return reject(err);
-            });
+      if (fhirFlattener === "fhir2es") {
+        let aggKey = "categories";
+        if (chart.value.maxCategories === 0 || categories.value.length === 0) {
+          aggKey = "series";
+        }
+        const url = `/es/${dataset.value.name}/_search?filter_path=aggregations`;
+        fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(query.value),
         })
-        .catch((err) => {
-          console.log(err);
+          .then((response) => {
+            response
+              .json()
+              .then((results) => {
+                if (!data.value) {
+                  data.value = results;
+                } else if (
+                  results.aggregations[aggKey].buckets &&
+                  results.aggregations[aggKey].buckets.length > 0
+                ) {
+                  data.value.aggregations[aggKey].buckets =
+                    data.value.aggregations[aggKey].buckets.concat(
+                      results.aggregations[aggKey].buckets
+                    );
+                }
+                if (
+                  results.aggregations &&
+                  results.aggregations[aggKey].after_key
+                ) {
+                  query.value.aggs[aggKey].composite.after =
+                    results.aggregations[aggKey].after_key;
+                  getData().then(() => {
+                    return resolve();
+                  });
+                } else {
+                  return resolve();
+                }
+              })
+              .catch((err) => {
+                console.log(err);
+                return reject(err);
+              });
+          })
+          .catch((err) => {
+            console.log(err);
+          });
+      } else if (fhirFlattener === "fhir2sql") {
+        const url = `/fhir2sql/run-sql`;
+        fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            query: query.value,
+          }),
+        }).then((response) => {
+          response.json().then((results) => {
+            data.value = results;
+            return resolve();
+          });
         });
+      }
     });
   }
 
@@ -315,6 +352,179 @@ export default function IhrisAxisChart(
       });
     }
   }
+  async function parseSQLResults() {
+    console.error(JSON.stringify(otherOptions.value, 0, 2));
+    let displayTopValues = otherOptions.value.horizontalValues.displayTopValues;
+    let displayTotalValues = otherOptions.value.horizontalValues.totalValues;
+    const level1Cat = [];
+    const seriesData = {};
+    if (displayTopValues) {
+      data.value.sort((a, b) => {
+        return b.count - a.count;
+      });
+    }
+    let key;
+    if (categories.value.length) {
+      key = categories.value[0].name;
+    } else {
+      key = series.value[0].name;
+    }
+    for (const bucket of data.value) {
+      let exists = level1Cat.find((cat) => {
+        return cat === bucket[key];
+      });
+      if (
+        !exists &&
+        (!displayTopValues || displayTotalValues > level1Cat.length)
+      ) {
+        level1Cat.push(bucket[key]);
+      } else if (!exists && !level1Cat[displayTotalValues]) {
+        level1Cat[displayTotalValues] = "Others";
+      }
+      if (bucket.series && bucket.series.buckets) {
+        for (const value of bucket.series.buckets) {
+          let name = value.key;
+          if (value.key_as_string) {
+            name = value.key_as_string;
+          }
+          if (!seriesData[name]) {
+            seriesData[name] = [];
+          }
+          let val = value.doc_count;
+          if (val === 0) {
+            val = "-";
+          }
+          if (
+            displayTopValues &&
+            seriesData[name].length >= displayTotalValues
+          ) {
+            if (!seriesData[name][displayTotalValues]) {
+              seriesData[name][displayTotalValues] = val;
+            } else {
+              if (val !== "-" && seriesData[name][displayTotalValues] == "-") {
+                seriesData[name][displayTotalValues] = 0;
+              }
+              if (seriesData[name][displayTotalValues] !== "-" && val == "-") {
+                continue;
+              }
+              seriesData[name][displayTotalValues] += val;
+            }
+          } else {
+            seriesData[name].push(val);
+          }
+        }
+      } else if (bucket.series && bucket.series.value) {
+        let value = bucket.series.value;
+        if (value === 0) {
+          value = "-";
+        }
+        if (!seriesData[series.value[0].display]) {
+          seriesData[series.value[0].display] = [];
+        }
+        seriesData[series.value[0].display].push(value);
+      } else if (categories.value.length === 0) {
+        let name = series.value[0].display;
+        let value = bucket.doc_count;
+        if (value === 0) {
+          value = "-";
+        }
+        if (!seriesData[series.value[0].display]) {
+          seriesData[series.value[0].display] = [];
+        }
+
+        if (
+          displayTopValues &&
+          seriesData[series.value[0].display].length >= displayTotalValues
+        ) {
+          if (!seriesData[name][displayTotalValues]) {
+            seriesData[name][displayTotalValues] = value;
+          } else {
+            if (value !== "-" && seriesData[name][displayTotalValues] == "-") {
+              seriesData[name][displayTotalValues] = 0;
+            }
+            if (seriesData[name][displayTotalValues] !== "-" && value == "-") {
+              continue;
+            }
+            seriesData[name][displayTotalValues] += value;
+          }
+        } else {
+          seriesData[name].push(value);
+        }
+      }
+    }
+    let xAxisSettings = {};
+    if (
+      option.value.xAxis &&
+      Array.isArray(option.value.xAxis) &&
+      option.value.xAxis.length > 0
+    ) {
+      xAxisSettings = JSON.parse(JSON.stringify(option.value.xAxis[0]));
+      delete xAxisSettings.data;
+    } else if (option.value.xAxis) {
+      xAxisSettings = JSON.parse(JSON.stringify(option.value.xAxis));
+      delete xAxisSettings.data;
+    }
+    let yAxisSettings = {};
+    if (
+      option.value.yAxis &&
+      Array.isArray(option.value.yAxis) &&
+      option.value.yAxis.length > 0
+    ) {
+      yAxisSettings = JSON.parse(JSON.stringify(option.value.yAxis[0]));
+      delete yAxisSettings.data;
+    } else if (option.value.yAxis) {
+      yAxisSettings = JSON.parse(JSON.stringify(option.value.yAxis));
+      delete yAxisSettings.data;
+    }
+    option.value.xAxis = [];
+    option.value.yAxis = [];
+    option.value.series = [];
+    if (level1Cat && level1Cat.length > 0) {
+      if (otherOptions.value.barsDirection === "vertical") {
+        option.value.xAxis.push({
+          ...xAxisSettings,
+          type: "category",
+          data: level1Cat,
+        });
+      } else {
+        option.value.yAxis.push({
+          ...yAxisSettings,
+          type: "category",
+          data: level1Cat,
+        });
+      }
+    }
+    if (otherOptions.value.barsDirection === "vertical") {
+      option.value.yAxis.push({
+        ...yAxisSettings,
+        type: "value",
+      });
+    } else {
+      option.value.xAxis.push({
+        ...xAxisSettings,
+        type: "value",
+      });
+    }
+    const chartOpt = chartOptions.value.find((opt) => {
+      return opt.type === chart.value.type;
+    });
+    for (const seriesName in seriesData) {
+      let hasGtZero = seriesData[seriesName].find((vl) => {
+        return vl !== "-";
+      });
+      //remove all series data that has all zero
+      if (!hasGtZero) {
+        continue;
+      }
+      option.value.series.push({
+        name: seriesName,
+        type: chart.value.type,
+        stack: "ser",
+        ...chartOpt,
+        data: seriesData[seriesName],
+      });
+    }
+  }
   async function parseResults() {
     let displayTopValues = otherOptions.value.horizontalValues.displayTopValues;
     let displayTotalValues = otherOptions.value.horizontalValues.totalValues;
@@ -329,7 +539,7 @@ export default function IhrisAxisChart(
         return b.doc_count - a.doc_count;
       });
     }
-
+    console.log(categories.value);
     for (const bucket of data.value.aggregations[aggKey].buckets) {
       const keys = Object.keys(bucket.key);
       for (const key of keys) {
@@ -410,6 +620,7 @@ export default function IhrisAxisChart(
         }
       }
     }
+    console.error(JSON.stringify(seriesData, 0, 2));
     let xAxisSettings = {};
     if (
       option.value.xAxis &&
