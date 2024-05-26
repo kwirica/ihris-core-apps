@@ -1,5 +1,19 @@
 <template>
   <v-container fluid>
+    <v-dialog v-model="deleteDash" persistent width="auto">
+      <v-card>
+        <v-card-title class="text-h5">
+          Are you sure you want to delete this Dashboard?
+        </v-card-title>
+        <v-card-actions class="justify-end">
+          <v-btn color="green darken-1" text @click="deleteDash = false">
+            No
+          </v-btn>
+          <v-spacer></v-spacer>
+          <v-btn color="red darken-1" text @click="deleteDashboard">Yes </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <v-dialog
       persistent
       transition="dialog-top-transition"
@@ -15,7 +29,7 @@
           >mdi-close</v-icon
         >
       </v-toolbar>
-      <v-card class="overflow-auto">
+      <v-card class="overflow-auto" v-if="!supportsRange">
         <v-row>
           <v-col cols="auto">
             <br />
@@ -59,6 +73,72 @@
             return-object
             v-model="activeDimension.selectedValues"
           />
+        </v-card-text>
+      </v-card>
+      <v-card class="overflow-auto" v-else>
+        <v-row justify="center">
+          <v-col cols="6" offset="3">
+            <br />
+            <v-select
+              :items="nonRangeFilterConditions"
+              v-model="activeDimension.filterCondition"
+              label="Condition"
+            ></v-select>
+          </v-col>
+          <v-spacer></v-spacer>
+          <v-col cols="2">
+            <br />
+            <v-btn color="accent" size="small" @click="applyFilters">
+              Apply
+            </v-btn>
+          </v-col>
+        </v-row>
+        <v-card-text v-if="activeDimension.data.type === 'date'">
+          <v-row justify="space-around">
+            <template v-if="activeDimension.filterCondition === 'range'">
+              <v-date-input
+                v-model="fromRange[activeDimension.data.name]"
+                label="From Date"
+                max-width="368"
+              ></v-date-input>
+              <v-date-input
+                v-model="toRange[activeDimension.data.name]"
+                label="To Date"
+                max-width="368"
+              ></v-date-input>
+            </template>
+            <v-date-input
+              v-else
+              v-model="nonRangeFilter[activeDimension.data.name]"
+              label="Select Date"
+              max-width="368"
+            ></v-date-input>
+          </v-row>
+        </v-card-text>
+        <v-card-text v-else-if="activeDimension.data.type === 'long'">
+          <v-row justify="space-around">
+            <template v-if="activeDimension.filterCondition === 'range'">
+              <v-text-field
+                v-model="fromRange[activeDimension.data.name]"
+                label="From"
+                max-width="160"
+                type="number"
+              ></v-text-field>
+              <v-text-field
+                v-model="toRange[activeDimension.data.name]"
+                label="To"
+                max-width="160"
+                type="number"
+              ></v-text-field>
+            </template>
+            <v-text-field
+              v-else
+              label="Filter Value"
+              max-width="160"
+              type="number"
+              v-model="nonRangeFilter[activeDimension.data.name]"
+            ></v-text-field>
+          </v-row>
         </v-card-text>
       </v-card>
     </v-dialog>
@@ -146,8 +226,9 @@
       </v-col>
       <v-col cols="12">
         <v-row>
-          <v-col cols="2">
+          <v-col cols="auto">
             <v-text-field
+              size="10"
               label="Dashboard Title*"
               outlined
               density="compact"
@@ -160,10 +241,10 @@
               </v-chip>
             </template>
           </v-col>
-          <v-col cols="2">
+          <v-col cols="auto">
             <v-autocomplete
               size="10"
-              width="30"
+              width="260"
               v-model="activeDimension.data"
               :items="dimensions"
               item-title="display"
@@ -195,7 +276,7 @@
               size="small"
               @click="deleteDash = true"
             >
-              <v-icon color="primary">mdi-delete-circle</v-icon>
+              <v-icon color="error">mdi-delete-circle</v-icon>
               <v-tooltip activator="parent" location="top">
                 Delete this dashboard
               </v-tooltip>
@@ -209,28 +290,6 @@
               </v-tooltip>
             </v-btn>
           </v-col>
-          <v-dialog v-model="deleteDash" persistent width="auto">
-            <!--<v-system-bar window color="primary" dark height="60px">
-              <v-spacer></v-spacer>
-              <v-icon @click="deleteDash = false" style="cursor: pointer">
-                mdi-close
-              </v-icon>
-            </v-system-bar>-->
-            <v-card>
-              <v-card-title class="text-h5">
-                Are you sure you want to delete this Dashboard?
-              </v-card-title>
-              <v-card-actions class="justify-end">
-                <v-btn color="green darken-1" text @click="deleteDash = false">
-                  No
-                </v-btn>
-                <v-spacer></v-spacer>
-                <v-btn color="red darken-1" text @click="deleteDashboard"
-                  >Yes
-                </v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-dialog>
           <v-spacer></v-spacer>
           <v-col cols="3">
             <v-row>
@@ -284,7 +343,14 @@
             closable
             @click:close="removeFilter(dimensionIndex, valueIndex)"
           >
-            {{ filter.display }}: {{ value.name }}
+            {{ filter.display }}:
+            <template v-if="value.name">
+              {{ value.name }}
+            </template>
+            <template v-else>
+              {{ value }}
+              <!-- {{ this.$moment(value).format("DD-MM-YYYY") }} -->
+            </template>
           </v-chip>
         </template>
         <template v-if="loadingDashData">
@@ -394,13 +460,95 @@ export default {
       activeDimension: {
         dimValues: [],
         selectedValues: [],
+        nonRangeFilterValues: [],
         filterCondition: "include",
+        nonRangeFilterCondition: "=",
         data: "",
         loading: false,
       },
+      nonRangeFilterConditions: [
+        {
+          title: "Equal",
+          value: "=",
+        },
+        {
+          title: "Range",
+          value: "range",
+        },
+        {
+          title: "Greater than",
+          value: "gt",
+        },
+        {
+          title: "Greater than or equal",
+          value: "gte",
+        },
+        {
+          title: "Less than",
+          value: "lt",
+        },
+        {
+          title: "Less than or equal",
+          value: "lte",
+        },
+      ],
+      fromRange: {},
+      toRange: {},
+      nonRangeFilter: {},
     };
   },
   watch: {
+    fromRange: {
+      handler(val) {
+        if (val) {
+          let from = val[this.activeDimension.data.name];
+          if (this.activeDimension.data.type === "date") {
+            from = this.$moment(from).format("DD-MM-YYYY");
+          }
+          if (this.activeDimension.selectedValues.length) {
+            let dateRange =
+              this.activeDimension.selectedValues[0].split(" to ");
+            dateRange[0] = from;
+            this.activeDimension.selectedValues[0] = dateRange.join(" to ");
+          } else {
+            this.activeDimension.selectedValues[0] = from + " to ";
+          }
+        }
+      },
+      deep: true,
+    },
+    toRange: {
+      handler(val) {
+        if (val) {
+          let to = val[this.activeDimension.data.name];
+          if (this.activeDimension.data.type === "date") {
+            to = this.$moment(to).format("DD-MM-YYYY");
+          }
+          if (this.activeDimension.selectedValues.length) {
+            let dateRange =
+              this.activeDimension.selectedValues[0].split(" to ");
+            dateRange[1] = to;
+            this.activeDimension.selectedValues[0] = dateRange.join(" to ");
+          } else {
+            this.activeDimension.selectedValues[0] = "  to " + to;
+          }
+        }
+      },
+      deep: true,
+    },
+    nonRangeFilter: {
+      handler(val) {
+        if (this.activeDimension.data.type === "date") {
+          this.activeDimension.selectedValues[0] = this.$moment(
+            val[this.activeDimension.data.name]
+          ).format("DD-MM-YYYY");
+        } else {
+          this.activeDimension.selectedValues[0] =
+            val[this.activeDimension.data.name];
+        }
+      },
+      deep: true,
+    },
     activeDimension: {
       handler() {
         if (!this.activeDimension.data.name) {
@@ -416,7 +564,24 @@ export default {
           type: this.activeDimension.data.type,
           filterCondition: this.activeDimension.filterCondition,
         };
-        if (this.activeDimension.selectedValues.length === 0) {
+        if (!Array.isArray(filter.values)) {
+          filter.values = [filter.values];
+        }
+        if (
+          filter.type === "date" &&
+          filter.filterCondition === "range" &&
+          filter.values.length > 1
+        ) {
+          let first = this.$moment(filter.values[0]).format("DD-MM-YYYY");
+          let last = this.$moment(
+            filter.values[filter.values.length - 1]
+          ).format("DD-MM-YYYY");
+          filter.values = [first + " to " + last];
+        }
+        if (
+          !this.activeDimension.selectedValues ||
+          this.activeDimension.selectedValues.length === 0
+        ) {
           if (index > -1) {
             this.filters.splice(index, 1);
           }
@@ -430,6 +595,15 @@ export default {
     },
   },
   computed: {
+    supportsRange() {
+      if (
+        this.activeDimension.data.type === "date" ||
+        this.activeDimension.data.type === "long"
+      ) {
+        return true;
+      }
+      return false;
+    },
     canSave() {
       if (this.visualizations.length > 0 && this.title) {
         return true;
@@ -466,24 +640,27 @@ export default {
         }
         fetch(url).then((response) => {
           response.json().then((data) => {
-            for (const entry of data.entry) {
-              const name = entry.resource.extension.find((ext) => {
-                return (
-                  ext.url ===
-                  "http://ihris.org/fhir/StructureDefinition/ihris-basic-name"
-                );
-              });
-              if (name) {
-                this.dashboards.push({
-                  id: entry.resource.id,
-                  name: name.valueString,
+            if (data && data.entry && data.entry.length) {
+              for (const entry of data.entry) {
+                const name = entry.resource.extension.find((ext) => {
+                  return (
+                    ext.url ===
+                    "http://ihris.org/fhir/StructureDefinition/ihris-basic-name"
+                  );
                 });
+                if (name) {
+                  this.dashboards.push({
+                    id: entry.resource.id,
+                    name: name.valueString,
+                  });
+                }
               }
             }
             const next = data.link.find((link) => {
               return link.relation === "next";
             });
             if (next) {
+              next.url = next.url.substring(next.url.indexOf("/fhir/"));
               this.getDashboards(next.url)
                 .then(() => {
                   return resolve();
@@ -513,7 +690,6 @@ export default {
             "Content-Type": "application/json",
           },
         }).then(() => {
-          //console.log(JSON.stringify(response), null, 2);
           this.$router.push({ name: "home" });
         });
       } else {
@@ -540,7 +716,11 @@ export default {
       this.activeDimension.loading = true;
       this.activeDimension.dimValues = [];
       this.activeDimension.selectedValues = [];
-      this.activeDimension.filterCondition = "include";
+      if (val.type === "date" || val.type === "long") {
+        this.activeDimension.filterCondition = "=";
+      } else {
+        this.activeDimension.filterCondition = "include";
+      }
       const filter = this.filters.find((filter) => {
         return filter.name === this.activeDimension.data.name;
       });
@@ -550,19 +730,23 @@ export default {
           JSON.stringify(filter.values)
         );
       }
-      const url = `/es/populateFilter/${val.dataset.name}/${val.name}?dataType=${val.type}`;
-      fetch(url, {
-        method: "GET",
-      }).then((response) => {
-        response.json().then((data) => {
-          this.activeDimension.loading = false;
-          for (const bucket of data) {
-            this.activeDimension.dimValues.push({
-              name: bucket.key.value,
-            });
-          }
+      if (val.type !== "date" && val.type !== "long") {
+        const url = `/es/populateFilter/${val.dataset.name}/${val.name}?dataType=${val.type}`;
+        fetch(url, {
+          method: "GET",
+        }).then((response) => {
+          response.json().then((data) => {
+            this.activeDimension.loading = false;
+            for (const bucket of data) {
+              this.activeDimension.dimValues.push({
+                name: bucket.key.value,
+              });
+            }
+          });
         });
-      });
+      } else {
+        this.activeDimension.loading = false;
+      }
     },
     popDimensions(dims) {
       for (const dim of dims.data) {

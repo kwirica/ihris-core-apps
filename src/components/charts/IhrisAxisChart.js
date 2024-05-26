@@ -620,7 +620,6 @@ export default function IhrisAxisChart(
         }
       }
     }
-    console.error(JSON.stringify(seriesData, 0, 2));
     let xAxisSettings = {};
     if (
       option.value.xAxis &&

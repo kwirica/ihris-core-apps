@@ -8,12 +8,14 @@ import { i18n, loadLanguage } from "./i18n";
 import fetchDefaults from "fetch-defaults";
 import * as Keycloak from "keycloak-js";
 import VueCookies from "vue-cookies";
+import moment from "moment";
 
 const app = createApp(App);
 app.use(router);
 app.use(store);
 app.use(VueGridLayout);
 app.use(i18n);
+app.config.globalProperties.$moment = moment;
 registerPlugins(app);
 
 app.config.globalProperties.$loadLanguage = function (locale) {

@@ -828,7 +828,14 @@
 </template>
 <script>
 import { Base64 } from "js-base64";
-import { ref, computed, watch, onMounted, nextTick } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  nextTick,
+  getCurrentInstance,
+} from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import draggable from "vuedraggable";
@@ -901,6 +908,7 @@ export default {
   setup(props, context) {
     const route = useRoute();
     const store = useStore();
+    const internalInstance = getCurrentInstance();
 
     const visualizations = ref([]);
     const displayVizList = ref(false);
@@ -1117,12 +1125,51 @@ export default {
         if (extFilter.type === "text") {
           field += ".keyword";
         }
-        if (Array.isArray(extFilter.values)) {
+        if (
+          (extFilter.type === "date" || extFilter.type === "long") &&
+          extFilter.filterCondition !== "="
+        ) {
+          if (!filter.bool.filter) {
+            filter.bool.filter = [];
+          }
+          let range = {};
+          range[field] = {};
+          if (extFilter.filterCondition === "range") {
+            let dateRanges = extFilter.values[0].split(" to ");
+            let from = dateRanges[0];
+            let to = dateRanges[1];
+            if (extFilter.type === "date") {
+              from = internalInstance.appContext.config.globalProperties
+                .$moment(from, "DD-MM-YYYY")
+                .format("YYYY-MM-DD");
+              to = internalInstance.appContext.config.globalProperties
+                .$moment(to, "DD-MM-YYYY")
+                .format("YYYY-MM-DD");
+            }
+            range[field] = {
+              gte: from,
+              lte: to,
+            };
+          } else {
+            range[field][extFilter.filterCondition] = extFilter.values[0];
+          }
+          filter.bool.filter.push({
+            range,
+          });
+        } else if (Array.isArray(extFilter.values)) {
           const terms = {
             terms: {},
           };
           terms.terms[field] = [];
-          for (const value of extFilter.values) {
+          for (let value of extFilter.values) {
+            if (
+              extFilter.type === "date" &&
+              extFilter.filterCondition === "="
+            ) {
+              value = internalInstance.appContext.config.globalProperties
+                .$moment(value, "DD-MM-YYYY")
+                .format("YYYY-MM-DD");
+            }
             terms.terms[field].push(value);
           }
           if (extFilter.filterCondition === "exclude") {
@@ -1131,6 +1178,7 @@ export default {
             filter.bool.must.push(terms);
           }
         }
+        console.error(JSON.stringify(filter, 0, 2));
       }
       return filter;
     }
