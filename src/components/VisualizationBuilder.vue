@@ -1053,7 +1053,7 @@ export default {
       };
       for (const category of categories.value) {
         let field = category.name;
-        if (category.type === "text") {
+        if (category.hasKeyword) {
           field += ".keyword";
         }
         if (category.defaultFilter !== "selected") {
@@ -1076,7 +1076,7 @@ export default {
       }
       for (const srs of series.value) {
         let field = srs.name;
-        if (srs.type === "text") {
+        if (srs.hasKeyword) {
           field += ".keyword";
         }
         if (srs.defaultFilter !== "selected") {
@@ -1099,7 +1099,7 @@ export default {
       }
       for (const flt of filters.value) {
         let field = flt.name;
-        if (flt.type === "text") {
+        if (flt.hasKeyword) {
           field += ".keyword";
         }
         if (flt.defaultFilter !== "selected") {
@@ -1122,7 +1122,7 @@ export default {
       }
       for (const extFilter of props.externalFilters) {
         let field = extFilter.name;
-        if (extFilter.type === "text") {
+        if (extFilter.hasKeyword) {
           field += ".keyword";
         }
         if (
@@ -1178,7 +1178,6 @@ export default {
             filter.bool.must.push(terms);
           }
         }
-        console.error(JSON.stringify(filter, 0, 2));
       }
       return filter;
     }
@@ -1930,7 +1929,7 @@ export default {
       this.activeDimension.name = this[type][indexInType].display;
       this.activeDimension.index = indexInType;
       const dimension = this[type][indexInType].name;
-      let url = `/es/populateFilter/${this.dataset.name}/${dimension}?dataType=${this[type][indexInType].type}`;
+      let url = `/es/populateFilter/${this.dataset.name}/${dimension}?dataType=${this[type][indexInType].type}&hasKeyword=${this[type][indexInType].hasKeyword}`;
       if (this.$store.state.fhirFlattener === "fhir2sql") {
         url = `/fhir2sql/populateFilter/${this.dataset.name}/${dimension}?dataType=${this[type][indexInType].type}`;
       }

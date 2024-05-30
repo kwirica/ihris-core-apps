@@ -716,7 +716,7 @@ export default {
       this.activeDimension.loading = true;
       this.activeDimension.dimValues = [];
       this.activeDimension.selectedValues = [];
-      if (val.type === "date" || val.type === "long") {
+      if (val.type === "date" || val.type === "long" || val.type === "float") {
         this.activeDimension.filterCondition = "=";
       } else {
         this.activeDimension.filterCondition = "include";
@@ -730,8 +730,8 @@ export default {
           JSON.stringify(filter.values)
         );
       }
-      if (val.type !== "date" && val.type !== "long") {
-        const url = `/es/populateFilter/${val.dataset.name}/${val.name}?dataType=${val.type}`;
+      if (val.type !== "date" && val.type !== "long" && val.type !== "float") {
+        const url = `/es/populateFilter/${val.dataset.name}/${val.name}?dataType=${val.type}&hasKeyword=${val.hasKeyword}`;
         fetch(url, {
           method: "GET",
         }).then((response) => {
