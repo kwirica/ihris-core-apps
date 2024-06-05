@@ -1,5 +1,5 @@
 import { ref } from "vue";
-export default function IhrisAxisChart(
+export default function IhrisTabularChart(
   series,
   categories,
   chart,
@@ -24,6 +24,7 @@ export default function IhrisAxisChart(
     };
   }
   function getChartData() {
+    console.error(JSON.stringify(otherOptions.value, 0, 2));
     return new Promise((resolve, reject) => {
       buildQuery()
         .then(() => {
@@ -134,6 +135,7 @@ export default function IhrisAxisChart(
           },
         };
       }
+      console.log("getting data");
       getData()
         .then(() => {
           if (categories.value.length > 1) {
@@ -161,6 +163,7 @@ export default function IhrisAxisChart(
           aggKey = "series";
         }
         const url = `/es/${dataset.value.name}/_search?filter_path=aggregations`;
+        console.log(url);
         fetch(url, {
           method: "POST",
           headers: {
@@ -531,20 +534,22 @@ export default function IhrisAxisChart(
     if (chart.value.maxCategories === 0 || categories.value.length === 0) {
       aggKey = "series";
     }
-    const level1Cat = [];
     const seriesData = {};
     if (displayTopValues) {
       data.value.aggregations[aggKey].buckets.sort((a, b) => {
         return b.doc_count - a.doc_count;
       });
     }
+    let rows = [];
     for (const bucket of data.value.aggregations[aggKey].buckets) {
       const keys = Object.keys(bucket.key);
       for (const key of keys) {
-        if (!displayTopValues || displayTotalValues > level1Cat.length) {
-          level1Cat.push(bucket.key[key]);
-        } else if (!level1Cat[displayTotalValues]) {
-          level1Cat[displayTotalValues] = "Others";
+        if (!displayTopValues || displayTotalValues > rows.length) {
+          rows.push({
+            name: bucket.key[key],
+          });
+        } else if (!rows[displayTotalValues]) {
+          rows[displayTotalValues] = { name: "Others" };
         }
       }
       if (bucket.series && bucket.series.buckets) {
@@ -553,30 +558,24 @@ export default function IhrisAxisChart(
           if (value.key_as_string) {
             name = value.key_as_string;
           }
-          if (!seriesData[name]) {
-            seriesData[name] = [];
-          }
           let val = value.doc_count;
           if (val === 0) {
             val = "-";
           }
-          if (
-            displayTopValues &&
-            seriesData[name].length >= displayTotalValues
-          ) {
-            if (!seriesData[name][displayTotalValues]) {
-              seriesData[name][displayTotalValues] = val;
+          if (displayTopValues && rows.length > displayTotalValues) {
+            if (!rows[displayTotalValues][name]) {
+              rows[displayTotalValues][name] = val;
             } else {
-              if (val !== "-" && seriesData[name][displayTotalValues] == "-") {
-                seriesData[name][displayTotalValues] = 0;
+              if (val !== "-" && rows[displayTotalValues][name] == "-") {
+                rows[displayTotalValues][name] = 0;
               }
-              if (seriesData[name][displayTotalValues] !== "-" && val == "-") {
+              if (rows[displayTotalValues][name] !== "-" && val == "-") {
                 continue;
               }
-              seriesData[name][displayTotalValues] += val;
+              rows[displayTotalValues][name] += val;
             }
           } else {
-            seriesData[name].push(val);
+            rows[rows.length - 1][name] = val;
           }
         }
       } else if (bucket.series && bucket.series.value) {
@@ -584,112 +583,32 @@ export default function IhrisAxisChart(
         if (value === 0) {
           value = "-";
         }
-        if (!seriesData[series.value[0].display]) {
-          seriesData[series.value[0].display] = [];
-        }
-        seriesData[series.value[0].display].push(value);
+        rows[rows.length - 1][series.value[0].display] = value;
       } else if (categories.value.length === 0) {
         let name = series.value[0].display;
         let value = bucket.doc_count;
         if (value === 0) {
           value = "-";
         }
-        if (!seriesData[series.value[0].display]) {
-          seriesData[series.value[0].display] = [];
-        }
 
-        if (
-          displayTopValues &&
-          seriesData[series.value[0].display].length >= displayTotalValues
-        ) {
+        if (displayTopValues && rows.length > displayTotalValues) {
           if (!seriesData[name][displayTotalValues]) {
-            seriesData[name][displayTotalValues] = value;
+            rows[displayTotalValues][name] = value;
           } else {
             if (value !== "-" && seriesData[name][displayTotalValues] == "-") {
-              seriesData[name][displayTotalValues] = 0;
+              rows[displayTotalValues][name] = 0;
             }
             if (seriesData[name][displayTotalValues] !== "-" && value == "-") {
               continue;
             }
-            seriesData[name][displayTotalValues] += value;
+            rows[displayTotalValues][name] += value;
           }
         } else {
-          seriesData[name].push(value);
+          rows[rows.length - 1][name] = value;
         }
       }
     }
-    let xAxisSettings = {};
-    if (
-      option.value.xAxis &&
-      Array.isArray(option.value.xAxis) &&
-      option.value.xAxis.length > 0
-    ) {
-      xAxisSettings = JSON.parse(JSON.stringify(option.value.xAxis[0]));
-      delete xAxisSettings.data;
-    } else if (option.value.xAxis) {
-      xAxisSettings = JSON.parse(JSON.stringify(option.value.xAxis));
-      delete xAxisSettings.data;
-    }
-    let yAxisSettings = {};
-    if (
-      option.value.yAxis &&
-      Array.isArray(option.value.yAxis) &&
-      option.value.yAxis.length > 0
-    ) {
-      yAxisSettings = JSON.parse(JSON.stringify(option.value.yAxis[0]));
-      delete yAxisSettings.data;
-    } else if (option.value.yAxis) {
-      yAxisSettings = JSON.parse(JSON.stringify(option.value.yAxis));
-      delete yAxisSettings.data;
-    }
-    option.value.xAxis = [];
-    option.value.yAxis = [];
-    option.value.series = [];
-    if (level1Cat && level1Cat.length > 0) {
-      if (otherOptions.value.barsDirection === "vertical") {
-        option.value.xAxis.push({
-          ...xAxisSettings,
-          type: "category",
-          data: level1Cat,
-        });
-      } else {
-        option.value.yAxis.push({
-          ...yAxisSettings,
-          type: "category",
-          data: level1Cat,
-        });
-      }
-    }
-    if (otherOptions.value.barsDirection === "vertical") {
-      option.value.yAxis.push({
-        ...yAxisSettings,
-        type: "value",
-      });
-    } else {
-      option.value.xAxis.push({
-        ...xAxisSettings,
-        type: "value",
-      });
-    }
-    const chartOpt = chartOptions.value.find((opt) => {
-      return opt.type === chart.value.type;
-    });
-    for (const seriesName in seriesData) {
-      let hasGtZero = seriesData[seriesName].find((vl) => {
-        return vl !== "-";
-      });
-      //remove all series data that has all zero
-      if (!hasGtZero) {
-        continue;
-      }
-      option.value.series.push({
-        name: seriesName,
-        type: chart.value.type,
-        stack: "ser",
-        ...chartOpt,
-        data: seriesData[seriesName],
-      });
-    }
+    option.value.rows = rows;
   }
   return {
     addFilters,

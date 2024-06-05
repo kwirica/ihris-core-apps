@@ -29,11 +29,18 @@ export default {
     const expandSettings = ref([]);
     const settings = ref([
       {
+        header: "Chart Toolbox",
+        component: "ChartToolbox",
+        updateEvent: "chartToolbox",
+        optionObject: "toolbox",
+        charts: ["bar", "pie", "line", "gauge", "scatter"],
+      },
+      {
         header: "Chart Title",
         component: "ChartTitle",
         updateEvent: "chartTitle",
         optionObject: "title",
-        charts: ["bar", "pie", "line", "gauge", "scatter"],
+        charts: ["bar", "pie", "line", "gauge", "scatter", "tabular"],
       },
       {
         header: "Chart Legend",
@@ -96,6 +103,7 @@ export default {
     };
   },
   components: {
+    ChartToolbox: defineAsyncComponent(() => import("./ChartToolbox.vue")),
     ChartTitle: defineAsyncComponent(() => import("./ChartTitle.vue")),
     ChartLegend: defineAsyncComponent(() => import("./ChartLegend.vue")),
     ChartToolTip: defineAsyncComponent(() => import("./ChartToolTip.vue")),

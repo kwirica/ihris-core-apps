@@ -930,6 +930,7 @@ export default {
           },
         ],
       };
+      let index = 0;
       for (const viz of this.visualizations) {
         dashboard.extension.push({
           url: "http://ihris.org/fhir/StructureDefinition/ihris-dashboard-visualization",
@@ -960,7 +961,7 @@ export default {
             },
             {
               url: "itemID",
-              valueInteger: viz.i,
+              valueInteger: index,
             },
             {
               url: "static",
@@ -968,6 +969,7 @@ export default {
             },
           ],
         });
+        index++;
       }
       let method = "POST";
       if (this.dashboardId) {

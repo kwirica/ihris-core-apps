@@ -48,7 +48,7 @@ const store = createStore({
       {
         type: "pie",
         subType: "donut",
-        renderComponent: "PieChart",
+        renderComponent: "IhrisPieChart",
         icon: "mdi-chart-donut",
         hasAxis: false,
         maxCategories: 2,
@@ -57,6 +57,19 @@ const store = createStore({
         minSeries: 0,
         title: "Donut",
         description: "Compare data in propotion to a whole",
+      },
+      {
+        type: "tabular",
+        subType: "",
+        renderComponent: "IhrisTabularChart",
+        icon: "mdi-table-large",
+        hasAxis: false,
+        maxCategories: 1,
+        maxSeries: 1,
+        minCategories: 0,
+        minSeries: 1,
+        title: "Tabular",
+        description: "Display data on a table",
       },
       {
         type: "line",

@@ -721,21 +721,43 @@
         <v-row v-if="editingViz"> </v-row>
         <v-row>
           <v-col cols="12">
-            <v-card v-if="displayChart && editingViz">
-              <v-card-text>
-                <v-chart
-                  :style="{ height: vizHeight + 'px' }"
-                  :key="softRerenderViz"
-                  :option="option"
-                />
-              </v-card-text>
-            </v-card>
-            <v-chart
-              v-else-if="displayChart"
-              :style="{ height: vizHeight + 'px' }"
-              :key="softRerenderViz"
-              :option="option"
-            />
+            <template
+              v-if="chart && chart.renderComponent === 'IhrisTabularChart'"
+            >
+              {{ option.title.text }}
+              <v-card v-if="displayChart && editingViz">
+                <v-card-text>
+                  <v-data-table
+                    :height="vizHeight + 'px'"
+                    :key="softRerenderViz"
+                    :items="option.rows"
+                  />
+                </v-card-text>
+              </v-card>
+              <v-data-table
+                v-else-if="displayChart"
+                :height="vizHeight + 'px'"
+                :key="softRerenderViz"
+                :items="option.rows"
+              />
+            </template>
+            <template v-else>
+              <v-card v-if="displayChart && editingViz">
+                <v-card-text>
+                  <v-chart
+                    :style="{ height: vizHeight + 'px' }"
+                    :key="softRerenderViz"
+                    :option="option"
+                  />
+                </v-card-text>
+              </v-card>
+              <v-chart
+                v-else-if="displayChart"
+                :style="{ height: vizHeight + 'px' }"
+                :key="softRerenderViz"
+                :option="option"
+              />
+            </template>
             <v-progress-linear
               color="red lighten-2"
               buffer-value="0"
@@ -747,7 +769,11 @@
           </v-col>
           <v-col
             cols="12"
-            v-if="renderSettings && chart.renderComponent === 'IhrisAxisChart'"
+            v-if="
+              renderSettings &&
+              (chart.renderComponent === 'IhrisAxisChart' ||
+                chart.renderComponent === 'IhrisTabularChart')
+            "
           >
             <h3>Basic Settings</h3>
             <v-row>
@@ -801,29 +827,6 @@
       @close="hideChartsList"
       @chartSelected="chartSelected"
     />
-    <!-- <axisChart
-      v-if="chart.renderComponent === 'AxisChart'"
-      :chartOptions="chartOptions"
-      :dataset="dataset"
-      :series="series"
-      :categories="categories"
-      :chart="chart"
-      :id="vizId"
-      v-model:options="option"
-      v-model:display-chart="displayChart"
-      v-model:loadingData="loadingData"
-    /> -->
-    <!-- <MetricChart
-      v-if="chart.renderComponent === 'MetricChart'"
-      :dataset="dataset"
-      :series="series"
-      :categories="categories"
-      :chart="chart"
-      :id="vizId"
-      v-model:options="option"
-      v-model:display-chart="displayChart"
-      v-model:loadingData="loadingData"
-    /> -->
   </v-container>
 </template>
 <script>
@@ -855,11 +858,13 @@ import {
   LegendComponent,
   GridComponent,
   GraphicComponent,
+  ToolboxComponent,
 } from "echarts/components";
 import VChart from "vue-echarts";
 import MetricChart from "./charts/IhrisMetricChart.js";
 import IhrisAxisChart from "./charts/IhrisAxisChart.js";
 import IhrisPieChart from "./charts/IhrisPieChart.js";
+import IhrisTabularChart from "./charts/IhrisTabularChart.js";
 import ChartsList from "./ChartsList.vue";
 import ChartSettings from "./settings/ChartSettings.vue";
 import GeneralSettings from "./settings/GeneralSettings.vue";
@@ -877,6 +882,7 @@ use([
   LegendComponent,
   GridComponent,
   GraphicComponent,
+  ToolboxComponent,
 ]);
 
 export default {
@@ -1034,6 +1040,19 @@ export default {
           option,
           chartOptions,
           dataset,
+          store.state.fhirFlattener
+        );
+        addFilters.value = IhrisChart.addFilters;
+        getChartData.value = IhrisChart.getChartData;
+      } else if (chart.value.renderComponent === "IhrisTabularChart") {
+        const IhrisChart = IhrisTabularChart(
+          series,
+          categories,
+          chart,
+          option,
+          chartOptions,
+          dataset,
+          otherOptions,
           store.state.fhirFlattener
         );
         addFilters.value = IhrisChart.addFilters;
