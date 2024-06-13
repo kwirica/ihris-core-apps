@@ -4,14 +4,15 @@
 ```
 git clone --single-branch --branch ihris-translator https://github.com/iHRIS/ihris-core-apps.git ihris-translator
 ```
-## Project setup
+## Install dependencies
 ```
+cd ihris-translator
 npm install
 ```
 
 ### Compiles and hot-reloads for development
 ```
-npm run serve
+npm run dev
 ```
 
 ### Compiles and minifies for production
