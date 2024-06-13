@@ -1,32 +1,32 @@
 
 # iHRIS navigation and role APPS
 
-# ihris-core-apps
-## Descriptions
-This repository contains all iHRIS apps that are shipped with iHRIS. It also contains a startup template that can help you to quickly create an iHRIS App using VUEJS.
-An iHRIS App can be cloned as below
+## Clone the repo
+```sh
+git clone --single-branch --branch ihris-identity-management https://github.com/iHRIS/ihris-core-apps.git ihris-identity-management
 ```
-git clone --single-branch --branch startup-template https://github.com/iHRIS/ihris-core-apps.git startup-template
-```
-## Project setup
-```
+
+## Install dependencies
+```sh
+cd ihris-identity-management
 npm install
 ```
 
-### Compiles and hot-reloads for development
-```
-npm run serve
+### Compile and Hot-Reload for Development
+
+```sh
+npm run dev
 ```
 
-### Compiles and minifies for production
-```
+### Compile and Minify for Production
+
+```sh
 npm run build
 ```
 
-### Lints and fixes files
-```
+### Lint with [ESLint](https://eslint.org/)
+
+```sh
 npm run lint
 ```
 
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
