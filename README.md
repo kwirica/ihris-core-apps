@@ -9,7 +9,7 @@ git clone --single-branch --branch data-visualizer https://github.com/iHRIS/ihri
 ```sh
 cd data-visualizer
 npm install
-``
+```
 
 ### Compile and Hot-Reload for Development
 
