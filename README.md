@@ -1,28 +1,31 @@
-# iHRIS APPS Startup Template
+# Reports Builder App
 
-## Cloning
+## Clone the repo
+```sh
+git clone --single-branch --branch ihris-report-builder https://github.com/iHRIS/ihris-core-apps.git ihris-report-builder
 ```
-git clone --single-branch --branch startup-template https://github.com/iHRIS/ihris-core-apps.git startup-template
-```
-## Project setup
-```
+
+## Install dependencies
+```sh
+cd ihris-report-builder
 npm install
 ```
 
-### Compiles and hot-reloads for development
-```
-npm run serve
+### Compile and Hot-Reload for Development
+
+```sh
+npm run dev
 ```
 
-### Compiles and minifies for production
-```
+### Compile and Minify for Production
+
+```sh
 npm run build
 ```
 
-### Lints and fixes files
-```
+### Lint with [ESLint](https://eslint.org/)
+
+```sh
 npm run lint
 ```
 
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
